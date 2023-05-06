@@ -24,7 +24,6 @@ tprint		tdump, tprint
 tproduct	tproduct
 tproject	tproject
 tquery		tquery
-trebin		trebin
 tselect		tselect
 tsort		tsort
 tstat		thistogram, tstat

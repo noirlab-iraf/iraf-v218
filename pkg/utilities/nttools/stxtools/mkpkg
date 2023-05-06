@@ -25,10 +25,6 @@ libpkg.a:
 	fparse.x	
 	grmimy.x	<imhdr.h>
 	isblank.x	<ctype.h>
-	lubksb.f       		
-	lubksd.f
-	ludcmd.x
-	ludcmp.x       	
 	postexit.x	<clset.h>
 	savgol.x	
 	sbuf.x		"sbuf.h"

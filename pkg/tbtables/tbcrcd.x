@@ -34,6 +34,7 @@ int	stat			# status from read operation
 int	read()
 int	tbalen()
 
+long	note()
 errchk	seek, read
 
 begin
@@ -45,91 +46,57 @@ begin
 	call salloc (pformat, SZ_COLFMT, TY_CHAR)
 	call salloc (temp, SZ_COLNAME, TY_CHAR)
 
-	offset = SZ_SIZINFO +
-		TB_MAXPAR(tp) * SZ_PACKED_REC +
-		(colnum-1) * SZ_COLDEF + 1
-        call seek (TB_FILE(tp), offset)
-
 	if (SZ_INT == SZ_INT32) {
+	    offset = SZ_SIZINFO +
+		TB_MAXPAR(tp) * SZ_PACKED_REC + (colnum-1) * SZ_COLDEF + 1
+            call seek (TB_FILE(tp), offset)
 
 	    stat = read (TB_FILE(tp), Memi[coldef], SZ_COLDEF)
 	    if (stat == EOF)
 	        call error (ER_TBCINFMISSING,
 			"tbcrcd:  EOF while reading column info for table")
-
-	    # Copy the column definition that we just read from the file into
-	    # the column descriptor in memory.
-	    COL_NUMBER(cp) = CD_COL_NUMBER(coldef)
-	    COL_OFFSET(cp) = CD_COL_OFFSET(coldef)
-	    COL_LEN(cp)    = CD_COL_LEN(coldef)
-	    COL_DTYPE(cp)  = CD_COL_DTYPE(coldef)
-
-	    COL_NELEM(cp)  = tbalen (cp)
-	    # COL_TDTYPE, COL_TSCAL, COL_TZERO are only relevant for FITS tables
-	    COL_TDTYPE(cp) = COL_DTYPE(cp)
-	    COL_TSCAL(cp)  = 1.d0
-	    COL_TZERO(cp)  = 0.d0
-
-	    # Check for and correct data type TY_CHAR.
-	    if (COL_DTYPE(cp) == TBL_TY_CHAR)
-	        COL_DTYPE(cp) = -COL_LEN(cp) * SZB_CHAR
-
-	    call tbbncp1 (CD_COL_NAME(coldef), COL_NAME(cp),
-		SZ_CD_COLNAME / SZB_CHAR)
-	    call strupk (COL_NAME(cp), COL_NAME(cp), SZ_COLNAME)
-
-	    call tbbncp1 (CD_COL_UNITS(coldef), COL_UNITS(cp),
-		SZ_CD_COLUNITS / SZB_CHAR)
-	    call strupk (COL_UNITS(cp), COL_UNITS(cp), SZ_COLUNITS)
-
-	    # include a leading '%' in the print format
-	    Memc[pformat] = '%'
-	    call tbbncp1 (CD_COL_FMT(coldef), Memc[pformat+1],
-		SZ_CD_COLFMT / SZB_CHAR)
-	    call strupk (Memc[pformat+1], Memc[pformat+1], SZ_COLFMT-1)
-	    call strcpy (Memc[pformat], COL_FMT(cp), SZ_COLFMT)
-
 	} else {
-	    # Read the first four int values.
-	    stat = read (TB_FILE(tp), Memi[coldef], 4 * SZ_INT32)
+	    offset = SZ_SIZINFO +
+		TB_MAXPAR(tp) * SZ_PACKED_REC +
+		(colnum-1) * (LEN_COLDEF * SZ_STRUCT32) + 1
+            call seek (TB_FILE(tp), offset)
+
+	    # Read and unpack the first four int values.
+	    stat = read (TB_FILE(tp), Memi[coldef], ((LEN_COLDEF*SZ_STRUCT32)))
 	    call iupk32 (Memi[coldef], Memi[coldef], 4 * SZ_INT32)
-
-	    # Copy the column definition that we just read from the file into
-	    # the column descriptor in memory.
-	    COL_NUMBER(cp) = CD_COL_NUMBER(coldef)
-	    COL_OFFSET(cp) = CD_COL_OFFSET(coldef)
-	    COL_LEN(cp)    = CD_COL_LEN(coldef)
-	    COL_DTYPE(cp)  = CD_COL_DTYPE(coldef)
-
-	    COL_NELEM(cp)  = tbalen (cp)
-	    COL_TDTYPE(cp) = COL_DTYPE(cp)
-	    COL_TSCAL(cp)  = 1.d0
-	    COL_TZERO(cp)  = 0.d0
-
-	    # Check for and correct data type TY_CHAR.
-	    if (COL_DTYPE(cp) == TBL_TY_CHAR)
-	        COL_DTYPE(cp) = -COL_LEN(cp) * SZB_CHAR
-
-	    call aclrc (Memc[temp], SZ_COLNAME)
-	    call aclrc (COL_NAME(cp), SZ_COLNAME)
-	    stat = read (TB_FILE(tp), Memc[temp], SZ_CD_COLNAME/SZB_CHAR)
-	    call strupk (Memc[temp], COL_NAME(cp), SZ_COLNAME)
-
-	    call aclrc (Memc[temp], SZ_COLUNITS)
-	    call aclrc (COL_UNITS(cp), SZ_COLUNITS)
-	    stat = read (TB_FILE(tp), Memc[temp], SZ_CD_COLUNITS/SZB_CHAR)
-	    call strupk (Memc[temp], COL_UNITS(cp), SZ_COLUNITS)
-
-	    call aclrc (Memc[temp], SZ_COLFMT)
-	    call aclrc (Memc[pformat], SZ_COLFMT)
-	    call aclrc (COL_FMT(cp), SZ_COLFMT)
-	    # include a leading '%' in the print format
-	    Memc[pformat] = '%'
-	    stat = read (TB_FILE(tp), Memc[temp], SZ_CD_COLFMT/SZB_CHAR)
-	    call strupk (Memc[temp], Memc[temp], SZ_COLFMT)
-	    call strcpy ("%", COL_FMT(cp), SZ_COLFMT)
-	    call strcat (Memc[temp], COL_FMT(cp), SZ_COLFMT)
 	}
+
+	# Copy the column definition that we just read from the file into
+	# the column descriptor in memory.
+	COL_NUMBER(cp) = CD_COL_NUMBER(coldef)
+	COL_OFFSET(cp) = CD_COL_OFFSET(coldef)
+	COL_LEN(cp)    = CD_COL_LEN(coldef)
+	COL_DTYPE(cp)  = CD_COL_DTYPE(coldef)
+
+	COL_NELEM(cp)  = tbalen (cp)
+	# COL_TDTYPE, COL_TSCAL, COL_TZERO are only relevant for FITS tables
+	COL_TDTYPE(cp) = COL_DTYPE(cp)
+	COL_TSCAL(cp)  = 1.d0
+	COL_TZERO(cp)  = 0.d0
+
+	# Check for and correct data type TY_CHAR.
+	if (COL_DTYPE(cp) == TBL_TY_CHAR)
+	    COL_DTYPE(cp) = -COL_LEN(cp) * SZB_CHAR
+
+	call tbbncp1 (CD_COL_NAME(coldef), COL_NAME(cp),
+		SZ_CD_COLNAME / SZB_CHAR)
+	call strupk (COL_NAME(cp), COL_NAME(cp), SZ_COLNAME)
+
+	call tbbncp1 (CD_COL_UNITS(coldef), COL_UNITS(cp),
+		SZ_CD_COLUNITS / SZB_CHAR)
+	call strupk (COL_UNITS(cp), COL_UNITS(cp), SZ_COLUNITS)
+
+	# include a leading '%' in the print format
+	Memc[pformat] = '%'
+	call tbbncp1 (CD_COL_FMT(coldef), Memc[pformat+1],
+		SZ_CD_COLFMT / SZB_CHAR)
+	call strupk (Memc[pformat+1], Memc[pformat+1], SZ_COLFMT-1)
+	call strcpy (Memc[pformat], COL_FMT(cp), SZ_COLFMT)
 
 	call sfree (sp)
 end
@@ -169,6 +136,8 @@ int	clen		# length in char of entire entry
 int	value		# this will be returned
 int	tbeszt()	# size in char of one element of type text
 
+int	sz
+
 begin
 	clen = COL_LEN(cptr)
 
@@ -204,7 +173,11 @@ begin
 		value = 1
 
 	default:
-	    value = clen / tbeszt (cptr)	# char string
+	    sz = tbeszt (cptr)			# char string
+            if (sz > 0)
+	        value = clen / sz
+	    else
+	        value = 0
 	}
 
 	return (value)
